@@ -27,3 +27,15 @@ Route::prefix('actas/ubigeo')->group(function () {
     Route::get('locales/{id}', [OnpeController::class, 'ubigeoLocales']);
     Route::get('grupos/{id}', [OnpeController::class, 'ubigeoGrupos']);
 });
+use App\Http\Controllers\api\AuthController;
+
+// ==========================================
+// RUTAS API AUTH / LOGIN (Semana 05)
+// ==========================================
+Route::prefix('login')->group(function () {
+    Route::post('/', [AuthController::class, 'login']);
+    Route::post('registrar', [AuthController::class, 'registrar']);
+    Route::post('recuperar', [AuthController::class, 'recuperar']);
+    Route::post('validar', [AuthController::class, 'validar']);
+    Route::post('passwordd', [AuthController::class, 'actualizarPassword']);
+});
