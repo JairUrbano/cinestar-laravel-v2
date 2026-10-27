@@ -9,17 +9,25 @@ class Usuario extends Model
 {
     use HasFactory;
 
-    protected $table = 'login.Usuario'; // Conecta directo a la BD Login
-    protected $primaryKey = 'id';
-    public $timestamps = false; // La tabla usa create_at y update_at con default
+    protected $table = 'Usuario';
+    protected $primaryKey = 'IdUsuario';
+
+    const CREATED_AT = 'created_at';
+    const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
         'Nombres',
+        'Apellidos',
+        'Dni',
+        'FechaNacimiento',
+        'Edad',
+        'Telefono',
         'Correo',
         'Passwordd',
+        'codigo_respaldo',
+        'codigo_recuperacion',
     ];
 
-    // Ocultar la contraseña en las respuestas JSON
     protected $hidden = [
         'Passwordd',
     ];

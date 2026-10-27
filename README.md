@@ -7,53 +7,125 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## About Laravel
+## 📥 Descarga Directa de Documentación (.docx)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Haz clic en los siguientes enlaces para descargar la documentación completa lista para imprimir o presentar:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* 📄 [**Descargar Informe Técnico de Implementación (.docx)**](https://github.com/iDanorever/Login_Laravel/releases/download/v1.0.0/explicacion1.docx)
+* ⚙️ [**Descargar Guía de Configuración y Comandos (.docx)**](https://github.com/iDanorever/Login_Laravel/releases/download/v1.0.0/explicacion2.1.docx)
+* 🗄️ [**Descargar Script SQL y Procedimientos Almacenados (.docx)**](https://github.com/iDanorever/Login_Laravel/releases/download/v1.0.0/explicacion3.docx)
+---
+# 🔐 TechAuth - Sistema de Autenticación, Recuperación de Contraseña y Passkeys
 
-## Learning Laravel
+![Laravel](https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Ngrok](https://img.shields.io/badge/Ngrok-111?style=for-the-badge&logo=ngrok&logoColor=white)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Sistema completo y robusto de autenticación desarrollado en **Laravel (API RESTful)** y **MySQL**, optimizado para entornos de escritorio y dispositivos móviles. Incorpora un flujo de recuperación de contraseña en tres pasos vía **SMTP (Gmail)** y la generación de códigos únicos de respaldo (**Passkeys**).
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## 🚀 Características Principales
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+* **Autenticación Multi-factor / Passkey:** Soporte para inicio de sesión estándar y acceso alternativo mediante código único de respaldo (*Passkey*).
+* **Recuperación en 3 Pasos:** Flujo dinámico desde `recuperar.html` (Solicitud de código ➔ Restablecimiento ➔ Generación opcional de nuevo Passkey).
+* **Emails Responsivos en Dark Mode:** Plantilla HTML/Blade (`recuperacion.blade.php`) optimizada para evitar la inversión de colores en clientes de correo móviles.
+* **Persistencia mediante Stored Procedures:** Seguridad e integridad en la base de datos utilizando Procedimientos Almacenados en MySQL.
+* **Soporte Móvil vía Ngrok:** Integración con túneles HTTPS para pruebas en tiempo real desde redes móviles externas.
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## 🛠️ Tecnologías Utilizadas
 
-## Contributing
+* **Backend:** Laravel 11.x (PHP 8.x) - Arquitectura API RESTful.
+* **Base de Datos:** MySQL (`loginDB`) con Procedimientos Almacenados (*Stored Procedures*).
+* **Notificaciones:** SMTP (Gmail) vía `Mailable` (`RecuperacionMail`).
+* **Frontend:** HTML5, JavaScript (ES6+ `fetch` API), Tailwind CSS (Estilo Cyberpunk / Dark Mode).
+* **Herramientas de Red:** Ngrok para túneles SSL/TLS.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 🗄️ Estructura de la Base de Datos (`loginDB`)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Para inicializar la base de datos, ejecuta el archivo SQL adjunto en el proyecto o corre el siguiente script en tu gestor MySQL:
 
-## Security Vulnerabilities
+```sql
+CREATE DATABASE IF NOT EXISTS loginDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE loginDB;
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+CREATE TABLE IF NOT EXISTS Usuario (
+    IdUsuario INT AUTO_INCREMENT PRIMARY KEY,
+    Nombres VARCHAR(100) NOT NULL,
+    Apellidos VARCHAR(100) NOT NULL,
+    Dni CHAR(8) NOT NULL UNIQUE,
+    FechaNacimiento DATE NOT NULL,
+    Edad INT NOT NULL,
+    Telefono VARCHAR(20) NOT NULL,
+    Correo VARCHAR(150) NOT NULL UNIQUE,
+    Passwordd VARCHAR(255) NOT NULL,
+    codigo_respaldo VARCHAR(50) DEFAULT NULL,
+    codigo_recuperacion VARCHAR(10) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-## License
+Nota: Revisa los scripts de los 5 Procedimientos Almacenados (sp_Usuario_Guardar, sp_Usuario_Login, sp_Usuario_LoginCodigo, sp_Usuario_GuardarCodigo, sp_Usuario_UpdatePassword) incluidos en la documentación.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## ⚙️ Configuración e Instalación Local
+1. Clonar el repositorio
+
+```git clone [https://github.com/iDanorever/Login_Laravel.git](https://github.com/iDanorever/Login_Laravel.git)
+cd Login_Laravel
+```
+---
+## 2. Configurar Variables de Entorno
+Copia el archivo .env.example a .env y configura tus credenciales locales:
+
+
+```
+cp .env.example .env
+```
+
+Configura tus credenciales SMTP de Gmail en el .env:
+
+```
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=loginDB
+DB_USERNAME=root
+DB_PASSWORD=
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+MAIL_USERNAME=tu_correo@gmail.com
+MAIL_PASSWORD=tu_contraseña_de_aplicacion
+MAIL_FROM_ADDRESS="tu_correo@gmail.com"
+MAIL_FROM_NAME="TechAuth Security"
+```
+---
+
+## 3. Iniciar el Servidor Laravel
+
+```
+php artisan config:clear
+php artisan route:clear
+php artisan serve --port=8000
+```
+
+## 4. Exponer con Ngrok (Para Pruebas en Celular)
+En una segunda terminal:
+```
+ngrok http 8000
+```
+Copia la URL https://xxxx.ngrok-free.dev generada y pégala en el parámetro APP_URL de tu .env
+
+---
+
+🧑‍💻 Autor
+Desarrollado por iDanorever
+Desarrollador de Software

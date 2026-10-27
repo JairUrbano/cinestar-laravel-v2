@@ -3,130 +3,206 @@
 namespace App\Http\Controllers\api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\QueryException;
+use App\Mail\RecuperacionMail;
 use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
-    // 1. POST /api/login -> Iniciar sesión
-    public function login(Request $request)
-    {
-        $correo = $request->input('correo');
-        $passwordd = $request->input('passwordd');
-
-        // Versión con Procedimiento Almacenado de la BD
-        $usuario = DB::selectOne('call login.sp_Usuario_Login(?, ?)', [$correo, $passwordd]);
-
-        if ($usuario) {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'id' => $usuario->id,
-                    'nombres' => $usuario->Nombres,
-                    'correo' => $usuario->Correo,
-                ],
-                'message' => 'Inicio de sesión exitoso'
-            ], 200);
-        }
-
-        return response()->json([
-            'success' => false,
-            'data' => null,
-            'message' => 'Credenciales incorrectas'
-        ], 401);
-    }
-
-    // 2. POST /api/login/registrar -> Guardar o actualizar usuario
+    // 1. Registro Técnico con Validación de Duplicados
     public function registrar(Request $request)
     {
-        $nombres = $request->input('nombres');
-        $correo = $request->input('correo');
-        $passwordd = $request->input('passwordd');
+        try {
+            // Validar si el DNI ya existe
+            $existeDni = DB::table('Usuario')->where('Dni', $request->dni)->exists();
+            if ($existeDni) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El DNI ingresado ya se encuentra registrado en el sistema.'
+                ], 422);
+            }
 
-        // Invoca sp_Usuario_Guardar
-        DB::statement('call login.sp_Usuario_Guardar(?, ?, ?)', [$nombres, $correo, $passwordd]);
+            // Validar si el Correo ya existe
+            $existeCorreo = DB::table('Usuario')->where('Correo', $request->correo)->exists();
+            if ($existeCorreo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El correo electrónico ya está asociado a otra cuenta.'
+                ], 422);
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'nombres' => $nombres,
-                'correo' => $correo
-            ],
-            'message' => 'Usuario registrado o actualizado con éxito'
-        ], 201);
+            
+
+            // Encriptar contraseña y generar Passkey de respaldo
+            $passHash = Hash::make($request->passwordd);
+            $codigoRespaldo = $request->codigo_respaldo ?? strtoupper(substr(md5(uniqid()), 0, 8));
+
+            // Ejecutar Stored Procedure
+            DB::select('call sp_Usuario_Guardar(?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+                $request->nombres,
+                $request->apellidos,
+                $request->dni,
+                $request->fechaNacimiento,
+                $request->edad ?? 18,
+                $request->telefono,
+                $request->correo,
+                $passHash,
+                $codigoRespaldo
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario registrado exitosamente.',
+                'codigo_respaldo' => $codigoRespaldo
+            ], 200);
+
+        } catch (QueryException $e) {
+            if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El DNI o Correo ya está registrado en el sistema.'
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la solicitud en la base de datos.'
+            ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno del servidor: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    // 3. POST /api/login/recuperar -> Generar código y enviar por correo
-    public function recuperar(Request $request)
+    // 2. Iniciar Sesión Estándar (Correo + Contraseña)
+    public function login(Request $request)
     {
-        $correo = $request->input('correo');
+        try {
+            $usuario = DB::selectOne('call sp_Usuario_Login(?)', [$request->correo]);
 
-        // Verificar si el usuario existe
-        $usuario = DB::selectOne('select * from login.Usuario where Correo = ?', [$correo]);
+            if (!$usuario) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El correo ingresado no existe.'
+                ], 404);
+            }
+
+            if (!Hash::check($request->passwordd, $usuario->Passwordd)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Contraseña incorrecta.'
+                ], 401);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $usuario,
+                'message' => '¡Inicio de sesión exitoso!'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en el servidor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // 3. Iniciar Sesión con Passkey / Código de Respaldo
+    public function loginCodigo(Request $request)
+    {
+        try {
+            $usuario = DB::selectOne('call sp_Usuario_LoginCodigo(?)', [$request->codigo]);
+
+            if ($usuario) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $usuario,
+                    'message' => 'Acceso concedido mediante Passkey de respaldo.'
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Código de acceso no válido o no encontrado.'
+            ], 401);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al validar Passkey: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // 4. Solicitar Código de Recuperación (Guardado en MySQL)
+    public function solicitarCodigo(Request $request)
+{
+    try {
+        $usuario = DB::selectOne('call sp_Usuario_Login(?)', [$request->correo]);
 
         if (!$usuario) {
             return response()->json([
                 'success' => false,
-                'message' => 'El correo no se encuentra registrado'
+                'message' => 'El correo electrónico no se encuentra registrado.'
             ], 404);
         }
 
-        // Generar un código aleatorio de 6 dígitos
-        $codigo = (string) rand(100000, 999999);
+        $codigo = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        DB::select('call sp_Usuario_GuardarCodigo(?, ?)', [$request->correo, $codigo]);
 
-        // Guardar el código en la base de datos usando el PA
-        DB::statement('call login.sp_Usuario_Codigo(?, ?)', [$correo, $codigo]);
-
-        // Intentar enviar el correo si está configurado en .env
-        try {
-            Mail::raw("Tu código de recuperación para el sistema es: $codigo", function ($message) use ($correo) {
-                $message->to($correo)->subject('Código de Recuperación de Contraseña');
-            });
-        } catch (\Exception $e) {
-            // Si el SMTP no está configurado, igual devolvemos el código en la respuesta para pruebas
-        }
+        // Enviar el correo electrónico real a través de Gmail
+        Mail::to($request->correo)->send(new RecuperacionMail($codigo, $request->correo));
 
         return response()->json([
             'success' => true,
-            'codigo_generado' => $codigo, // Útil para verificar en Postman/ThunderClient
-            'message' => 'Código de recuperación generado y enviado a su correo'
+            'message' => 'Correo de recuperación enviado con éxito a tu bandeja de entrada.'
         ], 200);
-    }
 
-    // 4. POST /api/login/validar -> Validar código de 6 dígitos
-    public function validar(Request $request)
-    {
-        $correo = $request->input('correo');
-        $codigo = $request->input('codigo');
-
-        $valido = DB::selectOne('call login.sp_Usuario_Validar(?, ?)', [$correo, $codigo]);
-
-        if ($valido) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Código válido, proceda a cambiar su contraseña'
-            ], 200);
-        }
-
+    } catch (\Exception $e) {
         return response()->json([
             'success' => false,
-            'message' => 'Código inválido o expirado'
-        ], 400);
+            'message' => 'Error al enviar el correo: ' . $e->getMessage()
+        ], 500);
     }
+}
 
-    // 5. POST /api/login/passwordd -> Cambiar contraseña
-    public function actualizarPassword(Request $request)
+   // 5. Cambiar Contraseña y Opcional Nueva Passkey
+    public function cambiarPassword(Request $request)
     {
-        $correo = $request->input('correo');
-        $passwordd = $request->input('passwordd');
+        try {
+            // Nota: Validamos si el campo de contraseña viene como 'password' o 'passwordd'
+            $passwordInput = $request->password ?? $request->passwordd;
+            $passHash = Hash::make($passwordInput);
+            
+            DB::select('call sp_Usuario_UpdatePassword(?, ?)', [$request->correo, $passHash]);
 
-        DB::statement('call login.sp_Usuario_Update(?, ?)', [$correo, $passwordd]);
+            $nuevaPasskey = null;
+            // Acepta tanto 'generar_passkey' como 'generar_nueva_passkey'
+            if ($request->generar_nueva_passkey || $request->generar_passkey) {
+                $nuevaPasskey = strtoupper(substr(md5(uniqid()), 0, 8));
+                DB::table('Usuario')->where('Correo', $request->correo)->update(['codigo_respaldo' => $nuevaPasskey]);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Contraseña actualizada correctamente'
-        ], 200);
+            return response()->json([
+                'success' => true,
+                'message' => 'Contraseña actualizada con éxito en la base de datos.',
+                'passkey'        => $nuevaPasskey, // Clave unificada para que el frontend la lea sin fallo
+                'nuevo_passkey'  => $nuevaPasskey,
+                'nueva_passkey'  => $nuevaPasskey
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar la contraseña: ' . $e->getMessage()
+            ], 500);
+        }
     }
+    
 }
